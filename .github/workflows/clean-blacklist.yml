@@ -1,0 +1,88 @@
+name: Clean Blacklist
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 3 * * *"
+
+jobs:
+  clean-blacklist:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Download Lists
+        run: |
+          echo "Downloading blacklist..."
+          curl -sL https://raw.githubusercontent.com/jackszb/Pure-Domains/main/merged_domains.txt -o blacklist.txt
+
+          echo "Downloading whitelists..."
+          mkdir -p whitelist
+
+          # 你可以在这里自由添加任意白名单链接
+          curl -sL https://raw.githubusercontent.com/neodevpro/neodevhost/master/allow -o whitelist/allow.txt
+          # curl -sL https://example.com/list2.txt -o whitelist/list2.txt
+          # curl -sL https://example.com/list3.txt -o whitelist/list3.txt
+
+      - name: Write Python Script
+        run: |
+          cat > clean.py << "PYEOF"
+import os
+
+def load_domains(path):
+    result = set()
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            d = line.strip().lower()
+            if d:
+                result.add(d)
+    return result
+
+# --- 加载黑名单 ---
+blacklist = load_domains("blacklist.txt")
+
+# --- 加载所有白名单并合并 ---
+whitelist = set()
+for file in os.listdir("whitelist"):
+    whitelist |= load_domains(os.path.join("whitelist", file))
+
+# --- 剔除白名单域名 ---
+cleaned = blacklist - whitelist
+
+# --- 排序 ---
+cleaned_sorted = sorted(cleaned)
+
+# --- 输出纯域名 ---
+with open("cleaned_domains.txt", "w", encoding="utf-8") as f:
+    for d in cleaned_sorted:
+        f.write(d + "\n")
+
+# --- 生成 AdGuard 格式 ---
+with open("adguard.txt", "w", encoding="utf-8") as f:
+    for d in cleaned_sorted:
+        f.write(f"||{d}^\n")
+
+print("黑名单总数：", len(blacklist))
+print("白名单总数：", len(whitelist))
+print("清理后的域名数量：", len(cleaned_sorted))
+print("已生成 cleaned_domains.txt 与 adguard.txt")
+PYEOF
+
+      - name: Run Python Script
+        run: python3 clean.py
+
+      - name: Commit and Push
+        run: |
+          git config --local user.email "github-actions@github.com"
+          git config --local user.name "GitHub Actions"
+
+          git add cleaned_domains.txt adguard.txt
+          git commit -m "Auto update blacklist + AdGuard format" || echo "Nothing to commit"
+          git push
