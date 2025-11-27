@@ -26,54 +26,50 @@ jobs:
           echo "Downloading whitelists..."
           mkdir -p whitelist
 
-          # 你可以在这里自由添加任意白名单链接
+          # 自由添加白名单
           curl -sL https://raw.githubusercontent.com/neodevpro/neodevhost/master/allow -o whitelist/allow.txt
-          # curl -sL https://example.com/list2.txt -o whitelist/list2.txt
-          # curl -sL https://example.com/list3.txt -o whitelist/list3.txt
+          # curl -sL https://example.com/whitelist2.txt -o whitelist/list2.txt
 
-      - name: Write Python Script
+      - name: Write Python Script (safe echo method)
         run: |
-          cat > clean.py << "PYEOF"
-import os
-
-def load_domains(path):
-    result = set()
-    with open(path, "r", encoding="utf-8") as f:
-        for line in f:
-            d = line.strip().lower()
-            if d:
-                result.add(d)
-    return result
-
-# --- 加载黑名单 ---
-blacklist = load_domains("blacklist.txt")
-
-# --- 加载所有白名单并合并 ---
-whitelist = set()
-for file in os.listdir("whitelist"):
-    whitelist |= load_domains(os.path.join("whitelist", file))
-
-# --- 剔除白名单域名 ---
-cleaned = blacklist - whitelist
-
-# --- 排序 ---
-cleaned_sorted = sorted(cleaned)
-
-# --- 输出纯域名 ---
-with open("cleaned_domains.txt", "w", encoding="utf-8") as f:
-    for d in cleaned_sorted:
-        f.write(d + "\n")
-
-# --- 生成 AdGuard 格式 ---
-with open("adguard.txt", "w", encoding="utf-8") as f:
-    for d in cleaned_sorted:
-        f.write(f"||{d}^\n")
-
-print("黑名单总数：", len(blacklist))
-print("白名单总数：", len(whitelist))
-print("清理后的域名数量：", len(cleaned_sorted))
-print("已生成 cleaned_domains.txt 与 adguard.txt")
-PYEOF
+          echo "import os" > clean.py
+          echo "" >> clean.py
+          echo "def load_domains(path):" >> clean.py
+          echo "    result = set()" >> clean.py
+          echo "    with open(path, 'r', encoding='utf-8') as f:" >> clean.py
+          echo "        for line in f:" >> clean.py
+          echo "            d = line.strip().lower()" >> clean.py
+          echo "            if d:" >> clean.py
+          echo "                result.add(d)" >> clean.py
+          echo "    return result" >> clean.py
+          echo "" >> clean.py
+          echo "# Load blacklist" >> clean.py
+          echo "blacklist = load_domains('blacklist.txt')" >> clean.py
+          echo "" >> clean.py
+          echo "# Load all whitelists" >> clean.py
+          echo "whitelist = set()" >> clean.py
+          echo "for file in os.listdir('whitelist'):" >> clean.py
+          echo "    whitelist |= load_domains(os.path.join('whitelist', file))" >> clean.py
+          echo "" >> clean.py
+          echo "# Remove whitelist domains" >> clean.py
+          echo "cleaned = blacklist - whitelist" >> clean.py
+          echo "" >> clean.py
+          echo "# Sort" >> clean.py
+          echo "cleaned_sorted = sorted(cleaned)" >> clean.py
+          echo "" >> clean.py
+          echo "# Write cleaned domains" >> clean.py
+          echo "with open('cleaned_domains.txt', 'w', encoding='utf-8') as f:" >> clean.py
+          echo "    for d in cleaned_sorted:" >> clean.py
+          echo "        f.write(d + '\\n')" >> clean.py
+          echo "" >> clean.py
+          echo "# Write AdGuard format" >> clean.py
+          echo "with open('adguard.txt', 'w', encoding='utf-8') as f:" >> clean.py
+          echo "    for d in cleaned_sorted:" >> clean.py
+          echo "        f.write(f'||{d}^\\n')" >> clean.py
+          echo "" >> clean.py
+          echo "print('黑名单：', len(blacklist))" >> clean.py
+          echo "print('白名单：', len(whitelist))" >> clean.py
+          echo "print('最终数量：', len(cleaned_sorted))" >> clean.py
 
       - name: Run Python Script
         run: python3 clean.py
