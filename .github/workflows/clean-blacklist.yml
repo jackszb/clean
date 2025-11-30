@@ -1,23 +1,26 @@
-name: Clean Blacklist
+name: Clean Blacklist and Convert to Binary
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 3 * * *"
+    - cron: "0 3 * * *"   # 每天 UTC 03:00 执行任务
 
 jobs:
   clean-blacklist:
     runs-on: ubuntu-latest
 
     steps:
+      # 检出仓库
       - name: Checkout repo
         uses: actions/checkout@v4
 
+      # 安装 Python
       - name: Install Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.x"
 
+      # 下载黑名单和白名单文件
       - name: Download Lists
         run: |
           echo "Downloading blacklist..."
@@ -25,11 +28,9 @@ jobs:
 
           echo "Downloading whitelists..."
           mkdir -p whitelist
-
-          # 自由添加白名单
           curl -sL https://raw.githubusercontent.com/jackszb/AdGuardHome-Filter/main/dist/whitelist.txt -o whitelist/allow.txt
-          # curl -sL https://example.com/whitelist2.txt -o whitelist/list2.txt
 
+      # 编写 Python 脚本进行黑名单清理
       - name: Write Python Script (safe echo method)
         run: |
           echo "import os" > clean.py
@@ -71,14 +72,25 @@ jobs:
           echo "print('白名单：', len(whitelist))" >> clean.py
           echo "print('最终数量：', len(cleaned_sorted))" >> clean.py
 
+      # 运行 Python 脚本清理黑名单并生成文件
       - name: Run Python Script
         run: python3 clean.py
 
+      # 安装 sing-box 并转换为二进制规则集
+      - name: Install sing-box
+        run: |
+          curl -fsSL https://sing-box.app/install.sh | sh
+
+      - name: Convert AdGuard file to binary
+        run: |
+          sing-box rule-set convert --type adguard --output adguard.srs adguard.txt
+
+      # 提交并推送更新
       - name: Commit and Push
         run: |
           git config --local user.email "github-actions@github.com"
           git config --local user.name "GitHub Actions"
 
-          git add cleaned_domains.txt adguard.txt
-          git commit -m "Auto update blacklist + AdGuard format" || echo "Nothing to commit"
+          git add cleaned_domains.txt adguard.txt adguard.srs
+          git commit -m "Auto update blacklist + AdGuard format and convert to binary" || echo "Nothing to commit"
           git push
