@@ -18,10 +18,10 @@ jobs:
       - name: Download Lists
         run: |
           echo "Downloading blacklist..."
-          curl -sL https://raw.githubusercontent.com/jackszb/AdGuardHome-Filter/main/dist/blocklist.txt -o blacklist.txt
+          curl -sL https://raw.githubusercontent.com/jackszb/AdGuardHome-Filter/main/cleaned_blocklist.txt -o blacklist.txt
 
           echo "Downloading whitelists..."
-          curl -sL https://raw.githubusercontent.com/jackszb/AdGuardHome-Filter/main/dist/whitelist.txt -o whitelist.txt
+          curl -sL https://raw.githubusercontent.com/jackszb/AdGuardHome-Filter/main/cleaned_whitelist.txt -o whitelist.txt
 
       # 合并黑名单和白名单文件
       - name: Merge Blacklist and Whitelist
