@@ -1,4 +1,4 @@
-name: Clean Blacklist and Convert to Binary
+name: Merge Blacklist and Whitelist and Convert to Binary
 
 on:
   workflow_dispatch:
@@ -6,19 +6,13 @@ on:
     - cron: "0 3 * * *"   # 每天 UTC 03:00 执行任务
 
 jobs:
-  clean-blacklist:
+  merge-blacklist-whitelist:
     runs-on: ubuntu-latest
 
     steps:
       # 检出仓库
       - name: Checkout repo
         uses: actions/checkout@v4
-
-      # 安装 Python
-      - name: Install Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.x"
 
       # 下载黑名单和白名单文件
       - name: Download Lists
@@ -27,63 +21,22 @@ jobs:
           curl -sL https://raw.githubusercontent.com/jackszb/AdGuardHome-Filter/main/dist/blocklist.txt -o blacklist.txt
 
           echo "Downloading whitelists..."
-          mkdir -p whitelist
-          curl -sL https://raw.githubusercontent.com/jackszb/AdGuardHome-Filter/main/dist/whitelist.txt -o whitelist/allow.txt
+          curl -sL https://raw.githubusercontent.com/jackszb/AdGuardHome-Filter/main/dist/whitelist.txt -o whitelist.txt
 
-      # 编写 Python 脚本进行黑名单清理
-      - name: Write Python Script (safe echo method)
+      # 合并黑名单和白名单文件
+      - name: Merge Blacklist and Whitelist
         run: |
-          echo "import os" > clean.py
-          echo "" >> clean.py
-          echo "def load_domains(path):" >> clean.py
-          echo "    result = set()" >> clean.py
-          echo "    with open(path, 'r', encoding='utf-8') as f:" >> clean.py
-          echo "        for line in f:" >> clean.py
-          echo "            d = line.strip().lower()" >> clean.py
-          echo "            if d:" >> clean.py
-          echo "                result.add(d)" >> clean.py
-          echo "    return result" >> clean.py
-          echo "" >> clean.py
-          echo "# Load blacklist" >> clean.py
-          echo "blacklist = load_domains('blacklist.txt')" >> clean.py
-          echo "" >> clean.py
-          echo "# Load all whitelists" >> clean.py
-          echo "whitelist = set()" >> clean.py
-          echo "for file in os.listdir('whitelist'):" >> clean.py
-          echo "    whitelist |= load_domains(os.path.join('whitelist', file))" >> clean.py
-          echo "" >> clean.py
-          echo "# Remove whitelist domains" >> clean.py
-          echo "cleaned = blacklist - whitelist" >> clean.py
-          echo "" >> clean.py
-          echo "# Sort" >> clean.py
-          echo "cleaned_sorted = sorted(cleaned)" >> clean.py
-          echo "" >> clean.py
-          echo "# Write cleaned domains" >> clean.py
-          echo "with open('cleaned_domains.txt', 'w', encoding='utf-8') as f:" >> clean.py
-          echo "    for d in cleaned_sorted:" >> clean.py
-          echo "        f.write(d + '\\n')" >> clean.py
-          echo "" >> clean.py
-          echo "# Write AdGuard format" >> clean.py
-          echo "with open('adguard.txt', 'w', encoding='utf-8') as f:" >> clean.py
-          echo "    for d in cleaned_sorted:" >> clean.py
-          echo "        f.write(f'||{d}^\\n')" >> clean.py
-          echo "" >> clean.py
-          echo "print('黑名单：', len(blacklist))" >> clean.py
-          echo "print('白名单：', len(whitelist))" >> clean.py
-          echo "print('最终数量：', len(cleaned_sorted))" >> clean.py
-
-      # 运行 Python 脚本清理黑名单并生成文件
-      - name: Run Python Script
-        run: python3 clean.py
+          echo "Merging blacklist and whitelist..."
+          cat blacklist.txt whitelist.txt > merged_list.txt
 
       # 安装 sing-box 并转换为二进制规则集
       - name: Install sing-box
         run: |
           curl -fsSL https://sing-box.app/install.sh | sh
 
-      - name: Convert AdGuard file to binary
+      - name: Convert merged list to binary
         run: |
-          sing-box rule-set convert --type adguard --output adguard.srs adguard.txt
+          sing-box rule-set convert --type adguard --output merged_list.srs merged_list.txt
 
       # 提交并推送更新
       - name: Commit and Push
@@ -91,6 +44,6 @@ jobs:
           git config --local user.email "github-actions@github.com"
           git config --local user.name "GitHub Actions"
 
-          git add cleaned_domains.txt adguard.txt adguard.srs
-          git commit -m "Auto update blacklist + AdGuard format and convert to binary" || echo "Nothing to commit"
+          git add merged_list.txt merged_list.srs
+          git commit -m "Auto merge blacklist and whitelist, convert to binary" || echo "Nothing to commit"
           git push
